@@ -11,6 +11,8 @@ type Mobipocket struct {
 	Metadata map[string][]string
 }
 
+// Open reads the file into memory and parses the headers to
+// populate the Metadata
 func Open(path string) (m *Mobipocket, e error) {
 	f, e := os.Open(path)
 	if e != nil {
@@ -45,6 +47,7 @@ func parse(r io.ReaderAt) map[string][]string {
 	// first record's offset is a uint32 at 0x4E
 	firstRecordOffset := int64(l(0x4E))
 	headerLength := int64(l(firstRecordOffset + 0x14))
+
 	// compressionType := int64(s(firstRecordOffset))
 	fullTitlePos := int64(l(firstRecordOffset + 0x54))
 	fullTitleLength := int64(l(firstRecordOffset + 0x58))
@@ -63,14 +66,17 @@ func parse(r io.ReaderAt) map[string][]string {
 
 	extBaseOffset := int64(firstRecordOffset + headerLength + 16)
 	extCount := int(l(extBaseOffset + 8))
+
 	pos := int64(12)
 	for i := 0; i < extCount; i++ {
 		recordType := int(l(extBaseOffset + pos))
 		recordLength := int64(l(extBaseOffset + pos + 4))
+
 		key, valid := exth[recordType]
 		if valid {
 			m[key] = append(m[key], str(extBaseOffset + pos + 8, recordLength - 8))
 		}
+
 		pos += recordLength
 	}
 
