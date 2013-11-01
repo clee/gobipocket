@@ -34,6 +34,7 @@ func parse(r io.ReaderAt) map[string][]string {
 		105: "subject",
 		106: "pubdate",
 		113: "asin",
+		503: "title",
 		504: "asin",
 	}
 
