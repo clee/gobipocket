@@ -1,46 +1,40 @@
 package mobipocket
 
 import (
-	"fmt"
 	"bytes"
 )
 
 func palmdoc_unpack(data []byte) string {
 	var buffer bytes.Buffer
-	fmt.Printf("data: %d bytes\n", len(data))
+	datalen := len(data)
 
-	for position := 0; position < len(data); {
-		currentByte := int(data[position])
+	for position := 0; position < datalen; {
+		c := int(data[position])
 		position += 1
-
-		if currentByte > 0x00 && currentByte < 0x09 {
-			buffer.WriteString(string(data[position:position+int(currentByte)]))
-		} else if currentByte < 0x80 {
-			buffer.WriteString(string(currentByte))
-		} else if currentByte >= 0xC0 {
-			buffer.WriteString(" " + string(currentByte ^ 128))
-		} else {
-			if position < len(data) {
-				currentByte = ((int(currentByte) << 8) | int(data[position]))
-				position += 1
-				distance := (int(currentByte) >> 3) & 0x07FF
-				length := (int(currentByte) & 7) + 3
-				if distance > length {
-					b := buffer.Bytes()
-					o := string(b[len(b)-distance:len(b) + length - distance])
-					buffer.WriteString(o)
-				} else {
-					// fmt.Printf("distance / length: %d / %d @%d\n", distance, length, position)
-					for i := 0; i < length; i++ {
-						o := buffer.String()
-						buffer.WriteString(string(o[len(o) - distance]))
-					}
-				}
+		if c >= 0xC0 {
+			buffer.WriteByte(' ')
+			buffer.WriteByte(byte(c) & 0x80)
+		} else if c >= 0x80 {
+			next := int(data[position])
+			position += 1
+			distance := ((((c << 8) | next) >> 3) & 0x7FF)
+			length := (next & 0x7) + 3;
+			for j := 0; j < length; j++ {
+				b := buffer.Bytes()
+				buffer.WriteByte(b[len(b) - distance])
 			}
+		} else if c >= 0x09 {
+			buffer.WriteByte(byte(c))
+		} else if c >= 0x01 {
+			for j := 0; j < c; j++ {
+				buffer.WriteByte(data[position + j])
+			}
+			position += c
+		} else {
+			buffer.WriteByte(byte(c))
 		}
 	}
 
 	s := buffer.String()
-	fmt.Printf("unpacked %d bytes\n", len(s))
 	return s
 }
