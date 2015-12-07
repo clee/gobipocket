@@ -2,6 +2,7 @@ package mobipocket
 
 import (
 	"io"
+	"fmt"
 	"log"
 	"os"
 	"strings"
