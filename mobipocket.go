@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"encoding/binary"
 )
@@ -26,13 +27,18 @@ func Open(path string) (m *Mobipocket, e error) {
 	m.parse(f)
 	// log.Println("parsed A-OK")
 	if m.Metadata["compression"][0] == "palmdoc" {
-		rawRecords := make([]string, 0)
+		expandedRecords := make([]string, 0)
 		for _, record := range m.RawTextRecords {
 			// log.Printf("attempting to unpack record #%d\n", recno)
-			rawRecords = append(rawRecords, palmdoc_unpack(record))
+			expandedRecords = append(expandedRecords, palmdoc_unpack(record))
 		}
-		raw := strings.Join(rawRecords, "")
-		// log.Printf("raw length: %d, supposedly: %s\n", len(raw), m.Metadata["textLength"][0])
+		expandedText := strings.Join(expandedRecords, "")
+		if etl, err := strconv.ParseInt(m.Metadata["textLength"][0], 10, 32); len(expandedText) != int(etl) {
+			log.Printf("raw length: %d, supposedly: %d\n", len(expandedText), etl)
+		} else if err != nil {
+			log.Printf("error converting m.Metadata['textLength'][0]!\n")
+			panic(err)
+		}
 	}
 
 	return m, nil
@@ -81,14 +87,7 @@ func (mobi *Mobipocket) parse(r io.ReaderAt) {
 	flags := int(s(firstRecordOffset + 0xF2))
 	// log.Printf("MobiPocket flags: 0x%x\n", flags)
 
-	multibyte := 0
-	trailers := 0
 	if headerLength > 0xE3 && mobiversion > 4 {
-		for multibyte = flags & 1; flags > 1; flags = flags >> 1 {
-			if flags & 2 == 2 {
-				trailers += 1
-			}
-		}
 		flags = int(s(firstRecordOffset + 0xF2))
 	} else {
 		flags = 0
@@ -100,6 +99,11 @@ func (mobi *Mobipocket) parse(r io.ReaderAt) {
 	m["textLength"] = []string{fmt.Sprintf("%d", l(firstRecordOffset + 0x04))}
 	firstTextRecord := 1 // int(s(firstRecordOffset + 0xC0))
 	numberTextRecords := int(s(firstRecordOffset + 0x08))
+
+	// sanity check: make sure recordCount is not smaller than numberTextRecords
+	if recordCount < numberTextRecords {
+		log.Printf("recordCount < numberTextRecords! That's really weird...\n")
+	}
 
 	// log.Printf("PalmDB record count: %d (first text: %d, numTR: %d)\n", recordCount, firstTextRecord, numberTextRecords);
 	/*
