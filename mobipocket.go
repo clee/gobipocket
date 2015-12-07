@@ -2,7 +2,7 @@ package mobipocket
 
 import (
 	"io"
-	"fmt"
+	"log"
 	"os"
 	"strings"
 	"encoding/binary"
@@ -23,15 +23,15 @@ func Open(path string) (m *Mobipocket, e error) {
 
 	m = new(Mobipocket)
 	m.parse(f)
-	fmt.Println("parsed A-OK")
+	// log.Println("parsed A-OK")
 	if m.Metadata["compression"][0] == "palmdoc" {
 		rawRecords := make([]string, 0)
 		for _, record := range m.RawTextRecords {
-			// fmt.Printf("attempting to unpack record #%d\n", recno)
+			// log.Printf("attempting to unpack record #%d\n", recno)
 			rawRecords = append(rawRecords, palmdoc_unpack(record))
 		}
 		raw := strings.Join(rawRecords, "")
-		fmt.Printf("raw length: %d, supposedly: %s\n", len(raw), m.Metadata["textLength"][0])
+		// log.Printf("raw length: %d, supposedly: %s\n", len(raw), m.Metadata["textLength"][0])
 	}
 
 	return m, nil
@@ -75,10 +75,10 @@ func (mobi *Mobipocket) parse(r io.ReaderAt) {
 	headerLength := int64(l(firstRecordOffset + 0x14))
 
 	mobiversion := int(l(firstRecordOffset + 0x24))
-	fmt.Printf("MobiPocket file version: %d\n", mobiversion);
+	// log.Printf("MobiPocket file version: %d\n", mobiversion);
 
 	flags := int(s(firstRecordOffset + 0xF2))
-	fmt.Printf("MobiPocket flags: 0x%x\n", flags)
+	// log.Printf("MobiPocket flags: 0x%x\n", flags)
 
 	multibyte := 0
 	trailers := 0
@@ -93,17 +93,17 @@ func (mobi *Mobipocket) parse(r io.ReaderAt) {
 		flags = 0
 	}
 
-	fmt.Printf("multibyte: %d\ntrailers: %d\n", multibyte, trailers)
+	// log.Printf("multibyte: %d\ntrailers: %d\n", multibyte, trailers)
 
 	m["compression"] = []string{compressionTypes[int(s(firstRecordOffset))]}
 	m["textLength"] = []string{fmt.Sprintf("%d", l(firstRecordOffset + 0x04))}
 	firstTextRecord := 1 // int(s(firstRecordOffset + 0xC0))
 	numberTextRecords := int(s(firstRecordOffset + 0x08))
 
-	fmt.Printf("PalmDB record count: %d (first text: %d, numTR: %d)\n", recordCount, firstTextRecord, numberTextRecords);
+	// log.Printf("PalmDB record count: %d (first text: %d, numTR: %d)\n", recordCount, firstTextRecord, numberTextRecords);
 	/*
 	for i := int(0); i < recordCount; i++ {
-		fmt.Printf("\trecord %d @ %d\n", i, l(0x4E + int64(i * 8)))
+		log.Printf("\trecord %d @ %d\n", i, l(0x4E + int64(i * 8)))
 	}
 	*/
 	mobi.RawTextRecords = make([][]byte, 0)
@@ -115,10 +115,10 @@ func (mobi *Mobipocket) parse(r io.ReaderAt) {
 		_, err := r.ReadAt(record, int64(recordStart))
 		record = getTrimmedRecordData(record, flags)
 		if err != nil {
-			fmt.Printf("Tried to read record size %d starting at %d\n", len(record), recordStart)
+			log.Printf("Tried to read record size %d starting at %d\n", len(record), recordStart)
 			panic(err);
 		}
-		// fmt.Printf("read record %d @ 0x%04x, length %d bytes\n", i, recordStart, len(record))
+		// log.Printf("read record %d @ 0x%04x, length %d bytes\n", i, recordStart, len(record))
 		mobi.RawTextRecords = append(mobi.RawTextRecords, record)
 	}
 	m["drm"] = []string{drmTypes[int(s(firstRecordOffset + 0x0C))]}
@@ -141,7 +141,7 @@ func (mobi *Mobipocket) parse(r io.ReaderAt) {
 
 	// extended header block should start with string EXTH
 	if str(firstRecordOffset + headerLength + 16, 4) != "EXTH" {
-		fmt.Printf("extended header is all wrong, man!\n")
+		log.Printf("extended header is all wrong, man!\n")
 		return
 	}
 
@@ -179,14 +179,14 @@ func (mobi *Mobipocket) parse(r io.ReaderAt) {
 func getTrailingSize(b []byte) uint32 {
 	val := uint32(0)
 	for _, currentByte := range b[len(b) - 4:] {
-		// fmt.Printf("currentByte: %x\n", currentByte)
+		// log.Printf("currentByte: %x\n", currentByte)
 		if currentByte & 0x80 == 0x80 {
 			val = 0
 		}
 		val = (val << 7) | uint32(currentByte & 0x7F)
 	}
 
-	// fmt.Printf("getTrailingSize returning value %d\n", val)
+	// log.Printf("getTrailingSize returning value %d\n", val)
 	return val;
 }
 
@@ -200,7 +200,7 @@ func getTrimmedRecordData(b []byte, flags int) []byte {
 	}
 	if flags & 1 == 1 {
 		s := uint32(c[len(c) - 1] & 0x03) + 1
-		// fmt.Printf("Stealing %d bytes from the end of the record\n", s)
+		// log.Printf("Stealing %d bytes from the end of the record\n", s)
 		c = c[:uint32(len(c)) - s]
 	}
 	return c
