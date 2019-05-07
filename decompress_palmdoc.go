@@ -13,7 +13,7 @@ func palmdoc_unpack(data []byte) string {
 		position += 1
 		if c >= 0xC0 {
 			buffer.WriteByte(' ')
-			buffer.WriteByte(byte(c) & 0x80)
+			buffer.WriteByte(byte(c) ^ 0x80)
 		} else if c >= 0x80 {
 			next := int(data[position])
 			position += 1
